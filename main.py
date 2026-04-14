@@ -1,4 +1,5 @@
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 import hashlib
 import json
 import os
@@ -14,9 +15,9 @@ logging.basicConfig(
 
 API_ID = int(os.getenv("TG_API_ID", "0"))
 API_HASH = os.getenv("TG_API_HASH", "")
-SESSION_NAME = os.getenv("TG_SESSION_NAME", "session")
+SESSION_STRING = os.getenv("TG_SESSION_STRING", "")
 TARGET_CHAT = os.getenv("TARGET_CHAT", "ai_r444")
-DEDUP_FILE = os.getenv("DEDUP_FILE", "sent_hashes.json")
+DEDUP_FILE = os.getenv("DEDUP_FILE", "/tmp/sent_hashes.json")
 
 SOURCE_CHATS_RAW = os.getenv(
     "SOURCE_CHATS",
@@ -26,7 +27,9 @@ SOURCE_CHATS_RAW = os.getenv(
 HEADER = os.getenv("POST_HEADER", "【东南亚那些事】")
 FOOTER = os.getenv(
     "POST_FOOTER",
-    "👉 海外交友群：https://t.me/ai_r4444\n✈️ 投稿爆料澄清：@rr_44i\n👉 关注那些事 》@ai_r444",
+    "👉 海外交友群：https://t.me/ai_r4444\n"
+    "✈️ 投稿爆料澄清：@rr_44i\n"
+    "👉 关注那些事 》@ai_r444",
 )
 
 SOURCE_CHATS = [x.strip() for x in SOURCE_CHATS_RAW.split(",") if x.strip()]
@@ -34,7 +37,25 @@ SOURCE_CHATS = [x.strip() for x in SOURCE_CHATS_RAW.split(",") if x.strip()]
 if not API_ID or not API_HASH:
     raise ValueError("缺少 TG_API_ID 或 TG_API_HASH 环境变量")
 
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+if not SESSION_STRING:
+    raise ValueError("缺少 TG_SESSION_STRING 环境变量")
+
+# ========= 存储 =========
+def load_hashes():
+    if os.path.exists(DEDUP_FILE):
+        try:
+            with open(DEDUP_FILE, "r", encoding="utf-8") as f:
+                return set(json.load(f))
+        except Exception as e:
+            logging.warning("读取去重文件失败: %s", e)
+            return set()
+    return set()
+
+def save_hashes(hashes):
+    with open(DEDUP_FILE, "w", encoding="utf-8") as f:
+        json.dump(list(hashes), f, ensure_ascii=False, indent=2)
+
+sent_hashes = load_hashes()
 
 # ========= 标签 =========
 def detect_tags(text):
@@ -76,23 +97,6 @@ def detect_tags(text):
             result.append(tag)
 
     return " ".join(result[:5])
-
-# ========= 存储 =========
-def load_hashes():
-    if os.path.exists(DEDUP_FILE):
-        try:
-            with open(DEDUP_FILE, "r", encoding="utf-8") as f:
-                return set(json.load(f))
-        except Exception as e:
-            logging.warning("读取去重文件失败: %s", e)
-            return set()
-    return set()
-
-def save_hashes(hashes):
-    with open(DEDUP_FILE, "w", encoding="utf-8") as f:
-        json.dump(list(hashes), f, ensure_ascii=False, indent=2)
-
-sent_hashes = load_hashes()
 
 # ========= 清洗 =========
 def clean_text(text):
@@ -202,102 +206,104 @@ async def delay():
     logging.info("延迟 %s 秒", t)
     await asyncio.sleep(t)
 
-# ========= 相册 =========
-@client.on(events.Album(chats=SOURCE_CHATS))
-async def album_handler(event):
-    global sent_hashes
+def register_handlers(client):
+    @client.on(events.Album(chats=SOURCE_CHATS))
+    async def album_handler(event):
+        global sent_hashes
 
-    try:
-        msgs = event.messages
-        text = "\n".join([m.raw_text or "" for m in msgs])
+        try:
+            msgs = event.messages
+            text = "\n".join([m.raw_text or "" for m in msgs])
 
-        if is_ad(text):
-            logging.info("广告拦截（相册）")
-            return
+            if is_ad(text):
+                logging.info("广告拦截（相册）")
+                return
 
-        files = []
-        caption_text = ""
+            files = []
+            caption_text = ""
 
-        for m in msgs:
-            if m.media:
-                files.append(m.media)
-            if m.raw_text:
-                caption_text += (m.raw_text + "\n")
+            for m in msgs:
+                if m.media:
+                    files.append(m.media)
+                if m.raw_text:
+                    caption_text += (m.raw_text + "\n")
 
-        if not files:
-            return
+            if not files:
+                return
 
-        h = make_hash(text)
+            h = make_hash(text)
 
-        if h in sent_hashes:
-            logging.info("重复相册，跳过")
-            return
+            if h in sent_hashes:
+                logging.info("重复相册，跳过")
+                return
 
-        await delay()
-        await client.send_file(
-            TARGET_CHAT,
-            files,
-            caption=build_caption(caption_text),
-            force_document=False,
-        )
-
-        sent_hashes.add(h)
-        save_hashes(sent_hashes)
-
-        logging.info("已发相册")
-
-    except Exception as e:
-        logging.exception("相册错误: %s", e)
-
-# ========= 单条 =========
-@client.on(events.NewMessage(chats=SOURCE_CHATS))
-async def handler(event):
-    global sent_hashes
-
-    try:
-        msg = event.message
-
-        if msg.grouped_id:
-            return
-
-        text = msg.raw_text or ""
-
-        if not text.strip() and msg.media:
-            text = "现场画面流出，更多情况持续关注。"
-
-        if is_ad(text):
-            logging.info("广告拦截（单条）")
-            return
-
-        h = make_hash(text)
-
-        if h in sent_hashes:
-            logging.info("重复消息，跳过")
-            return
-
-        await delay()
-
-        if msg.media:
+            await delay()
             await client.send_file(
                 TARGET_CHAT,
-                msg.media,
-                caption=build_caption(text),
-            )
-        else:
-            await client.send_message(
-                TARGET_CHAT,
-                build_caption(text),
+                files,
+                caption=build_caption(caption_text),
+                force_document=False,
             )
 
-        sent_hashes.add(h)
-        save_hashes(sent_hashes)
+            sent_hashes.add(h)
+            save_hashes(sent_hashes)
 
-        logging.info("已发一条")
+            logging.info("已发相册")
 
-    except Exception as e:
-        logging.exception("错误: %s", e)
+        except Exception as e:
+            logging.exception("相册错误: %s", e)
+
+    @client.on(events.NewMessage(chats=SOURCE_CHATS))
+    async def handler(event):
+        global sent_hashes
+
+        try:
+            msg = event.message
+
+            if msg.grouped_id:
+                return
+
+            text = msg.raw_text or ""
+
+            if not text.strip() and msg.media:
+                text = "现场画面流出，更多情况持续关注。"
+
+            if is_ad(text):
+                logging.info("广告拦截（单条）")
+                return
+
+            h = make_hash(text)
+
+            if h in sent_hashes:
+                logging.info("重复消息，跳过")
+                return
+
+            await delay()
+
+            if msg.media:
+                await client.send_file(
+                    TARGET_CHAT,
+                    msg.media,
+                    caption=build_caption(text),
+                )
+            else:
+                await client.send_message(
+                    TARGET_CHAT,
+                    build_caption(text),
+                )
+
+            sent_hashes.add(h)
+            save_hashes(sent_hashes)
+
+            logging.info("已发一条")
+
+        except Exception as e:
+            logging.exception("错误: %s", e)
 
 async def main():
+    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+    register_handlers(client)
+
     await client.start()
     logging.info("运行中...")
     await client.run_until_disconnected()
