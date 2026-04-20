@@ -497,8 +497,7 @@ def choose_title_pool(text: str):
         return ["【警惕】", "【曝光】", "【最新】", "【值得关注】"]
     if any(x in text for x in ["签证", "海关", "边检", "出入境"]):
         return ["【提醒】", "【最新消息】", "【出入境关注】", "【政策变化】"]
-    return ["【最新】", "【关注】", "【东南亚快讯】", "【消息汇总】"]
-
+return ["【最新】", "【关注】", "【东南亚快讯】", "【最新动态】"]
 
 def get_title(text: str) -> str:
     return random.choice(choose_title_pool(text))
@@ -513,7 +512,7 @@ def make_hook(text: str) -> str:
         return "👇 现场情况持续发酵，评论区聊聊"
     if any(x in text for x in ["绑架", "失联", "解救"]):
         return "👇 后续进展值得关注"
-    return "👇 评论区聊聊，你怎么看"
+   return "👇 更多情况持续关注"
 
 
 # ========= 文案 =========
