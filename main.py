@@ -34,13 +34,11 @@ SOURCE_CHATS_RAW = os.getenv(
 # 例: bx666:100,miandiands:95,bg123:90
 SOURCE_PRIORITY_RAW = os.getenv("SOURCE_PRIORITY", "")
 
-HEADER = os.getenv("POST_HEADER", "【东南亚那些事】")
-FOOTER = os.getenv(
-    "POST_FOOTER",
-    "👉 海外交友群：https://t.me/ai_r4444\n"
-    "✈️ 投稿爆料澄清：@rr_44i\n"
-    "👉 关注那些事 》@ai_r444",
-)
+# 你现在不想再默认带“东南亚那些事”
+HEADER = os.getenv("POST_HEADER", "")
+
+# 你现在不想再默认加底部链接
+FOOTER = os.getenv("POST_FOOTER", "")
 
 SOURCE_CHATS = [x.strip().lstrip("@").lower() for x in SOURCE_CHATS_RAW.split(",") if x.strip()]
 
@@ -52,6 +50,7 @@ if not SESSION_STRING:
 
 if not SOURCE_CHATS:
     raise ValueError("SOURCE_CHATS 为空，请至少填写一个来源频道/群组")
+
 
 def parse_source_priority(raw: str) -> dict:
     result = {}
@@ -67,11 +66,14 @@ def parse_source_priority(raw: str) -> dict:
             continue
     return result
 
+
 SOURCE_PRIORITY = parse_source_priority(SOURCE_PRIORITY_RAW)
 DUPLICATE_SECONDS = int(DUPLICATE_HOURS * 3600)
 
+
 def ensure_parent_dir(file_path: str):
     Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
 
 # ========= 存储 =========
 def load_state():
@@ -101,6 +103,7 @@ def load_state():
 
     return default_state
 
+
 def save_state():
     try:
         ensure_parent_dir(DEDUP_FILE)
@@ -115,11 +118,13 @@ def save_state():
     except Exception as e:
         logging.warning("保存去重状态失败: %s", e)
 
+
 state = load_state()
 strict_hashes = deque(state["strict_hashes"][-DEDUP_WINDOW:], maxlen=DEDUP_WINDOW)
 loose_hashes = deque(state["loose_hashes"][-DEDUP_WINDOW:], maxlen=DEDUP_WINDOW)
 media_hashes = deque(state["media_hashes"][-DEDUP_WINDOW:], maxlen=DEDUP_WINDOW)
 recent_items = deque(state["recent_items"][-DEDUP_WINDOW:], maxlen=DEDUP_WINDOW)
+
 
 # ========= 工具 =========
 def get_source_patterns():
@@ -134,7 +139,9 @@ def get_source_patterns():
         ])
     return patterns
 
+
 SOURCE_PATTERNS = get_source_patterns()
+
 
 def get_source_username(event) -> str:
     try:
@@ -146,10 +153,12 @@ def get_source_username(event) -> str:
         pass
     return ""
 
+
 def get_source_priority(source_username: str) -> int:
     if not source_username:
         return 0
     return SOURCE_PRIORITY.get(source_username.lower(), 0)
+
 
 def get_chat_name(event) -> str:
     try:
@@ -164,32 +173,56 @@ def get_chat_name(event) -> str:
         pass
     return "unknown_chat"
 
+
 def remove_source_links(text: str) -> str:
     text = text or ""
     for pattern in SOURCE_PATTERNS:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE)
     return text
 
+
 def clean_text(text: str) -> str:
     text = (text or "").strip()
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
 
+    # 删来源链接
     text = remove_source_links(text)
-    text = re.sub(r"http\S+", "", text)
+
+    # 删 Telegram 链接 / 普通链接
+    text = re.sub(r"https?://t\.me/\S+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"t\.me/\S+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"http\S+", "", text, flags=re.IGNORECASE)
+
+    # 删固定来源 / 固定栏目
+    text = re.sub(r"(?im)^.*人民日报.*$", "", text)
+    text = re.sub(r"(?im)^.*东南亚大事件.*$", "", text)
+    text = re.sub(r"(?im)^.*消息汇总.*$", "", text)
+    text = re.sub(r"(?im)^.*东南亚那些事.*$", "", text)
+
+    # 删常见引流 / 投稿 / 关注 / 评论话术
     text = re.sub(r"(?im)^.*(订阅|投稿|客服|联系|交友|关注那些事|频道合作|商务合作|广告投放).*$", "", text)
-    text = re.sub(r"#\w+\b", "", text)
-    text = re.sub(r"(?<!\w)@\w+", "", text)
-    text = re.sub(r"[⚡🦑🔠👈👉❤️✈️👑📢👍💥🔥✅✔️☑️]", "", text)
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"(?im)^.*(点击关注|欢迎关注|更多请关注|加入频道|加入群组).*$", "", text)
     text = re.sub(r"(?im)^.*(评论区聊聊|你怎么看|欢迎留言|欢迎讨论).*$", "", text)
 
+    # 删标签 / 用户名
+    text = re.sub(r"#\w+\b", "", text)
+    text = re.sub(r"(?<!\w)@\w+", "", text)
+
+    # 删部分 emoji / 装饰符号
+    text = re.sub(r"[⚡🦑🔠👈👉❤️✈️👑📢👍💥🔥✅✔️☑️😭📣🔊👇🔗]", "", text)
+
+    # 清理多余空白
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
     return text.strip()
+
 
 def trim_text(text: str) -> str:
     if len(text) > MAX_TEXT_LEN:
         return text[:MAX_TEXT_LEN] + "..."
     return text
+
 
 def normalize_strict(text: str) -> str:
     text = clean_text(text)
@@ -198,11 +231,12 @@ def normalize_strict(text: str) -> str:
     text = re.sub(r"\s+", "", text)
     return text.strip()
 
+
 def normalize_loose(text: str) -> str:
     text = clean_text(text)
     text = re.sub(r"^【.*?】", "", text)
     text = re.sub(
-        r"(警方通报|最新情况|刚刚通报|突发|现场曝光|最新|关注|东南亚快讯|东南亚那些事|快讯)",
+        r"(警方通报|最新情况|刚刚通报|突发|现场曝光|最新|关注|东南亚快讯|东南亚那些事|快讯|消息汇总|人民日报|东南亚大事件)",
         "",
         text,
     )
@@ -210,10 +244,12 @@ def normalize_loose(text: str) -> str:
     text = re.sub(r"\s+", " ", text)
     return text.strip().lower()
 
+
 def make_strict_hash(text: str, media_count: int = 0) -> str:
     core = normalize_strict(text)
     raw = f"{core[:180]}|len={len(core)}|media={media_count}"
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
 
 def make_loose_hash(text: str) -> str:
     core = normalize_loose(text)
@@ -222,6 +258,7 @@ def make_loose_hash(text: str) -> str:
         words = words[:80]
     raw = " ".join(words)
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
+
 
 def get_media_signature(media) -> str:
     if not media:
@@ -243,6 +280,7 @@ def get_media_signature(media) -> str:
 
     return ""
 
+
 def make_album_media_hash(messages) -> str:
     signatures = []
     for m in messages or []:
@@ -257,6 +295,7 @@ def make_album_media_hash(messages) -> str:
     raw = "|".join(sorted(signatures))
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
+
 def make_single_media_hash(message) -> str:
     if not getattr(message, "media", None):
         return ""
@@ -264,6 +303,7 @@ def make_single_media_hash(message) -> str:
     if not sig:
         return ""
     return hashlib.md5(sig.encode("utf-8")).hexdigest()
+
 
 def text_similarity(a: str, b: str) -> float:
     if not a or not b:
@@ -280,6 +320,7 @@ def text_similarity(a: str, b: str) -> float:
         return 0.0
 
     return inter / union
+
 
 def is_duplicate(text: str, source_username: str, media_hash: str = "", media_count: int = 0) -> tuple[bool, str]:
     now_ts = int(time.time())
@@ -320,6 +361,7 @@ def is_duplicate(text: str, source_username: str, media_hash: str = "", media_co
 
     return False, ""
 
+
 def remember_post(text: str, source_username: str, media_hash: str = "", media_count: int = 0):
     strict_hashes.append(make_strict_hash(text, media_count=media_count))
     loose_hashes.append(make_loose_hash(text))
@@ -338,6 +380,7 @@ def remember_post(text: str, source_username: str, media_hash: str = "", media_c
         })
 
     save_state()
+
 
 # ========= 标签引擎 =========
 LOCATION_RULES = [
@@ -408,6 +451,7 @@ TOPIC_RULES = [
     ("#新闻", ["消息", "通报", "情况", "事件", "快讯"]),
 ]
 
+
 def detect_tags(text: str) -> str:
     text = text or ""
     geo_tags = []
@@ -438,6 +482,7 @@ def detect_tags(text: str) -> str:
 
     return " ".join(result[:8])
 
+
 # ========= 标题 / hook =========
 def choose_title_pool(text: str):
     if any(x in text for x in ["警方", "公安", "抓捕", "通缉", "遣返"]):
@@ -454,8 +499,10 @@ def choose_title_pool(text: str):
         return ["【提醒】", "【最新消息】", "【出入境关注】", "【政策变化】"]
     return ["【最新】", "【关注】", "【东南亚快讯】", "【消息汇总】"]
 
+
 def get_title(text: str) -> str:
     return random.choice(choose_title_pool(text))
+
 
 def make_hook(text: str) -> str:
     if any(x in text for x in ["警方", "公安", "抓捕", "通缉", "遣返"]):
@@ -467,6 +514,7 @@ def make_hook(text: str) -> str:
     if any(x in text for x in ["绑架", "失联", "解救"]):
         return "👇 后续进展值得关注"
     return "👇 评论区聊聊，你怎么看"
+
 
 # ========= 文案 =========
 def build_caption(text: str) -> str:
@@ -480,16 +528,24 @@ def build_caption(text: str) -> str:
     title = get_title(cleaned)
     hook = make_hook(cleaned)
 
-    parts = [
-        title,
-        HEADER,
-        short_text,
-        hook,
-        tags,
-        FOOTER,
-    ]
+    parts = [title]
 
-    return "\n\n".join(part for part in parts if part and part.strip())
+    if HEADER and HEADER.strip():
+        parts.append(HEADER.strip())
+
+    parts.append(short_text)
+
+    if hook and hook.strip():
+        parts.append(hook.strip())
+
+    if tags and tags.strip():
+        parts.append(tags.strip())
+
+    if FOOTER and FOOTER.strip():
+        parts.append(FOOTER.strip())
+
+    return "\n\n".join(parts)
+
 
 # ========= 广告过滤 =========
 def is_ad(text: str) -> tuple[bool, str]:
@@ -521,11 +577,13 @@ def is_ad(text: str) -> tuple[bool, str]:
 
     return False, ""
 
+
 # ========= 延迟 =========
 async def delay():
     t = random.randint(5, 12)
     logging.info("延迟 %s 秒后发送", t)
     await asyncio.sleep(t)
+
 
 def register_handlers(client):
     @client.on(events.Album(chats=SOURCE_CHATS))
@@ -659,6 +717,7 @@ def register_handlers(client):
         except Exception as e:
             logging.exception("单条错误: %s", e)
 
+
 async def main():
     logging.info("启动中...")
     logging.info("目标频道: %s", TARGET_CHAT)
@@ -676,6 +735,7 @@ async def main():
     logging.info("Telegram 已连接，运行中...")
 
     await client.run_until_disconnected()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
