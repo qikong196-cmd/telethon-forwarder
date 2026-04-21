@@ -557,6 +557,18 @@ def build_caption(text: str) -> str:
 def is_ad(text: str) -> tuple[bool, str]:
     lower_text = (text or "").lower()
 
+    # ❗强制封杀指定域名（最高优先级）
+kill_domains = [
+    "u8.com",
+    "7t.com",
+]
+
+lower_text = (text or "").lower()
+
+for d in kill_domains:
+    if d in lower_text:
+        return True, f"命中黑名单域名: {d}"
+
     hard = [
         "送彩金", "注册送", "邀请码", "下注", "上分",
         "娱乐城", "pg集团", "pg直营", "官方飞投",
