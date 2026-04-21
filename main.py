@@ -34,10 +34,10 @@ SOURCE_CHATS_RAW = os.getenv(
 # 例: bx666:100,miandiands:95,bg123:90
 SOURCE_PRIORITY_RAW = os.getenv("SOURCE_PRIORITY", "")
 
-# 你现在不想再默认带“东南亚那些事”
+# 默认不再自动带“东南亚那些事”
 HEADER = os.getenv("POST_HEADER", "")
 
-# 你现在不想再默认加底部链接
+# 默认不再自动加底部链接
 FOOTER = os.getenv("POST_FOOTER", "")
 
 SOURCE_CHATS = [x.strip().lstrip("@").lower() for x in SOURCE_CHATS_RAW.split(",") if x.strip()]
@@ -191,7 +191,7 @@ def clean_text(text: str) -> str:
     # 删 Telegram 链接 / 普通链接
     text = re.sub(r"https?://t\.me/\S+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"t\.me/\S+", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"http\S+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"https?://\S+", "", text, flags=re.IGNORECASE)
 
     # 删固定来源 / 固定栏目
     text = re.sub(r"(?im)^.*人民日报.*$", "", text)
@@ -497,7 +497,8 @@ def choose_title_pool(text: str):
         return ["【警惕】", "【曝光】", "【最新】", "【值得关注】"]
     if any(x in text for x in ["签证", "海关", "边检", "出入境"]):
         return ["【提醒】", "【最新消息】", "【出入境关注】", "【政策变化】"]
-return ["【最新】", "【关注】", "【东南亚快讯】", "【最新动态】"]
+    return ["【最新】", "【关注】", "【东南亚快讯】", "【最新动态】"]
+
 
 def get_title(text: str) -> str:
     return random.choice(choose_title_pool(text))
@@ -505,14 +506,14 @@ def get_title(text: str) -> str:
 
 def make_hook(text: str) -> str:
     if any(x in text for x in ["警方", "公安", "抓捕", "通缉", "遣返"]):
-        return "👇 最新动态，评论区聊聊你怎么看"
+        return "👇 最新动态，持续关注"
     if any(x in text for x in ["诈骗", "电诈", "园区"]):
         return "👇 转发提醒身边人，小心踩坑"
     if any(x in text for x in ["冲突", "打架", "现场", "突发", "枪击"]):
-        return "👇 现场情况持续发酵，评论区聊聊"
+        return "👇 现场情况持续发酵"
     if any(x in text for x in ["绑架", "失联", "解救"]):
         return "👇 后续进展值得关注"
-   return "👇 更多情况持续关注"
+    return "👇 更多情况持续关注"
 
 
 # ========= 文案 =========
