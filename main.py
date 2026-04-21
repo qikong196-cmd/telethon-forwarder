@@ -699,18 +699,36 @@ def register_handlers(client):
                 return
 
             raw_text = msg.raw_text or ""
-            has_media = bool(msg.media)
-            media_hash = make_single_media_hash(msg)
+has_media = bool(msg.media)
+media_hash = make_single_media_hash(msg)
 
-            if not raw_text.strip() and has_media:
-                raw_text = "现场画面流出，更多情况持续关注。"
+logging.info("=== 来源=%s | has_media=%s ===", source_name, has_media)
+logging.info("=== 原始文本=%s ===", raw_text[:500])
 
-            cleaned_text = clean_text(raw_text)
+if not raw_text.strip() and has_media:
+    raw_text = "现场画面流出，更多情况持续关注。"
 
-            ad_flag, ad_reason = is_ad(cleaned_text)
-            if ad_flag:
-                logging.info("广告拦截（单条）| 来源=%s | 原因=%s", source_name, ad_reason)
-                return
+cleaned_text = clean_text(raw_text)
+logging.info("=== 清洗后文本=%s ===", cleaned_text[:500])
+
+ad_flag, ad_reason = is_ad(cleaned_text)
+logging.info("=== 广告判断=%s | 原因=%s ===", ad_flag, ad_reason)
+if ad_flag:
+    logging.info("广告拦截（单条）| 来源=%s | 原因=%s", source_name, ad_reason)
+    return
+
+dup_flag, dup_reason = is_duplicate(
+    cleaned_text or "single_only_media",
+    source_username=source_username,
+    media_hash=media_hash,
+    media_count=1 if has_media else 0,
+)
+logging.info("=== 去重判断=%s | 原因=%s ===", dup_flag, dup_reason)
+if dup_flag:
+    logging.info("重复消息，跳过 | 来源=%s | 原因=%s", source_name, dup_reason)
+    return
+
+logging.info("=== 准备发送到目标=%s ===", TARGET_CHAT)
 
             dup_flag, dup_reason = is_duplicate(
                 cleaned_text or "single_only_media",
