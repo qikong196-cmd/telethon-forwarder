@@ -695,12 +695,12 @@ def register_handlers(client):
             source_username = get_source_username(event)
 
             if msg.grouped_id:
-                logging.info("单条跳过：属于相册分组 | 来源=%s", source_name)
+               logging.info("单条跳过：属于相册分组 | 来源=%s", source_name)
                 return
 
             raw_text = msg.raw_text or ""
-has_media = bool(msg.media)
-media_hash = make_single_media_hash(msg)
+         has_media = bool(msg.media)
+     media_hash = make_single_media_hash(msg)
 
 logging.info("=== 来源=%s | has_media=%s ===", source_name, has_media)
 logging.info("=== 原始文本=%s ===", raw_text[:500])
