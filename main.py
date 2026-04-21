@@ -563,8 +563,6 @@ kill_domains = [
     "7t.com",
 ]
 
-lower_text = (text or "").lower()
-
 for d in kill_domains:
     if d in lower_text:
         return True, f"命中黑名单域名: {d}"
