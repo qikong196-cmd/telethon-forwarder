@@ -626,109 +626,34 @@ async def delay():
 
 def register_handlers(client):
     @client.on(events.Album(chats=SOURCE_CHATS))
-    async def album_handler(event):
-        try:
-            msgs = event.messages or []
-            source_name = get_chat_name(event)
-            source_username = get_source_username(event)
-
-            raw_text = "\n".join((m.raw_text or "") for m in msgs).strip()
-            media_files = [m.media for m in msgs if m.media]
-            caption_text = "\n".join((m.raw_text or "") for m in msgs if m.raw_text).strip()
-            media_hash = make_album_media_hash(msgs)
-
-            if not media_files:
-                logging.info("相册跳过：没有媒体 | 来源=%s", source_name)
-                return
-
-            base_text = caption_text or raw_text or "album_only_media"
-            cleaned_check_text = clean_text(base_text)
-
-            ad_flag, ad_reason = is_ad(cleaned_check_text)
-            if ad_flag:
-                logging.info("广告拦截（相册）| 来源=%s | 原因=%s", source_name, ad_reason)
-                return
-
-            dup_flag, dup_reason = is_duplicate(
-                cleaned_check_text or "album_only_media",
-                source_username=source_username,
-                media_hash=media_hash,
-                media_count=len(media_files),
-            )
-            if dup_flag:
-                logging.info("重复相册，跳过 | 来源=%s | 原因=%s", source_name, dup_reason)
-                return
-
-            logging.info(
-                "收到相册 | 来源=%s | 优先级=%s | 图片数=%s | 媒体去重=%s | 文本预览=%s",
-                source_name,
-                get_source_priority(source_username),
-                len(media_files),
-                "是" if media_hash else "否",
-                (cleaned_check_text[:60] if cleaned_check_text else "[无文本]"),
-            )
-
-            await delay()
-            await client.send_file(
-                TARGET_CHAT,
-                media_files,
-                caption=build_caption(base_text),
-                force_document=False,
-            )
-
-            remember_post(
-                cleaned_check_text or "album_only_media",
-                source_username=source_username,
-                media_hash=media_hash,
-                media_count=len(media_files),
-            )
-            logging.info("已发相册 | 来源=%s -> 目标=%s", source_name, TARGET_CHAT)
-
-        except Exception as e:
-            logging.exception("相册错误: %s", e)
-
-    @client.on(events.NewMessage(chats=SOURCE_CHATS))
-    async def message_handler(event):
+        async def message_handler(event):
         try:
             msg = event.message
             source_name = get_chat_name(event)
             source_username = get_source_username(event)
 
             if msg.grouped_id:
-               logging.info("单条跳过：属于相册分组 | 来源=%s", source_name)
+                logging.info("单条跳过：属于相册分组 | 来源=%s", source_name)
                 return
 
             raw_text = msg.raw_text or ""
-         has_media = bool(msg.media)
-     media_hash = make_single_media_hash(msg)
+            has_media = bool(msg.media)
+            media_hash = make_single_media_hash(msg)
 
-logging.info("=== 来源=%s | has_media=%s ===", source_name, has_media)
-logging.info("=== 原始文本=%s ===", raw_text[:500])
+            logging.info("=== 来源=%s | has_media=%s ===", source_name, has_media)
+            logging.info("=== 原始文本=%s ===", raw_text[:500])
 
-if not raw_text.strip() and has_media:
-    raw_text = "现场画面流出，更多情况持续关注。"
+            if not raw_text.strip() and has_media:
+                raw_text = "现场画面流出，更多情况持续关注。"
 
-cleaned_text = clean_text(raw_text)
-logging.info("=== 清洗后文本=%s ===", cleaned_text[:500])
+            cleaned_text = clean_text(raw_text)
+            logging.info("=== 清洗后文本=%s ===", cleaned_text[:500])
 
-ad_flag, ad_reason = is_ad(cleaned_text)
-logging.info("=== 广告判断=%s | 原因=%s ===", ad_flag, ad_reason)
-if ad_flag:
-    logging.info("广告拦截（单条）| 来源=%s | 原因=%s", source_name, ad_reason)
-    return
-
-dup_flag, dup_reason = is_duplicate(
-    cleaned_text or "single_only_media",
-    source_username=source_username,
-    media_hash=media_hash,
-    media_count=1 if has_media else 0,
-)
-logging.info("=== 去重判断=%s | 原因=%s ===", dup_flag, dup_reason)
-if dup_flag:
-    logging.info("重复消息，跳过 | 来源=%s | 原因=%s", source_name, dup_reason)
-    return
-
-logging.info("=== 准备发送到目标=%s ===", TARGET_CHAT)
+            ad_flag, ad_reason = is_ad(cleaned_text)
+            logging.info("=== 广告判断=%s | 原因=%s ===", ad_flag, ad_reason)
+            if ad_flag:
+                logging.info("广告拦截（单条）| 来源=%s | 原因=%s", source_name, ad_reason)
+                return
 
             dup_flag, dup_reason = is_duplicate(
                 cleaned_text or "single_only_media",
@@ -736,6 +661,7 @@ logging.info("=== 准备发送到目标=%s ===", TARGET_CHAT)
                 media_hash=media_hash,
                 media_count=1 if has_media else 0,
             )
+            logging.info("=== 去重判断=%s | 原因=%s ===", dup_flag, dup_reason)
             if dup_flag:
                 logging.info("重复消息，跳过 | 来源=%s | 原因=%s", source_name, dup_reason)
                 return
@@ -755,12 +681,101 @@ logging.info("=== 准备发送到目标=%s ===", TARGET_CHAT)
                 await client.send_file(
                     TARGET_CHAT,
                     msg.media,
-                    caption=build_caption(raw_text),
+                    caption=build_caption(cleaned_text),
                 )
             else:
                 await client.send_message(
                     TARGET_CHAT,
-                    build_caption(raw_text),
+                    build_caption(cleaned_text),
+                )
+
+            remember_post(
+                cleaned_text or "single_only_media",
+                source_username=source_username,
+                media_hash=media_hash,
+                media_count=1 if has_media else 0,
+            )
+            logging.info("已发一条 | 来源=%s -> 目标=%s", source_name, TARGET_CHAT)
+
+        except Exception as e:
+            logging.exception("单条错误: %s", e)
+
+你这次覆盖时注意两点：
+
+第一，最上面的 @client.on(events.NewMessage(chats=SOURCE_CHATS)) 一定保留。
+第二，整段的缩进不要改，尤其是 try: 下面所有内容和最后的 except。
+
+覆盖完重新部署，再看日志。
+如果还有问题，把新的日志截图发我。
+
+说错 是到775
+已思考 8s
+
+好，这次我直接给你 691 到 775 可直接覆盖版。
+你把这一整段原样替换掉就行：
+
+    @client.on(events.NewMessage(chats=SOURCE_CHATS))
+    async def message_handler(event):
+        try:
+            msg = event.message
+            source_name = get_chat_name(event)
+            source_username = get_source_username(event)
+
+            if msg.grouped_id:
+                logging.info("单条跳过：属于相册分组 | 来源=%s", source_name)
+                return
+
+            raw_text = msg.raw_text or ""
+            has_media = bool(msg.media)
+            media_hash = make_single_media_hash(msg)
+
+            logging.info("=== 来源=%s | has_media=%s ===", source_name, has_media)
+            logging.info("=== 原始文本=%s ===", raw_text[:500])
+
+            if not raw_text.strip() and has_media:
+                raw_text = "现场画面流出，更多情况持续关注。"
+
+            cleaned_text = clean_text(raw_text)
+            logging.info("=== 清洗后文本=%s ===", cleaned_text[:500])
+
+            ad_flag, ad_reason = is_ad(cleaned_text)
+            logging.info("=== 广告判断=%s | 原因=%s ===", ad_flag, ad_reason)
+            if ad_flag:
+                logging.info("广告拦截（单条）| 来源=%s | 原因=%s", source_name, ad_reason)
+                return
+
+            dup_flag, dup_reason = is_duplicate(
+                cleaned_text or "single_only_media",
+                source_username=source_username,
+                media_hash=media_hash,
+                media_count=1 if has_media else 0,
+            )
+            logging.info("=== 去重判断=%s | 原因=%s ===", dup_flag, dup_reason)
+            if dup_flag:
+                logging.info("重复消息，跳过 | 来源=%s | 原因=%s", source_name, dup_reason)
+                return
+
+            logging.info(
+                "收到单条 | 来源=%s | 优先级=%s | 含媒体=%s | 媒体去重=%s | 文本预览=%s",
+                source_name,
+                get_source_priority(source_username),
+                has_media,
+                "是" if media_hash else "否",
+                (cleaned_text[:60] if cleaned_text else "[无文本]"),
+            )
+
+            await delay()
+
+            if has_media:
+                await client.send_file(
+                    TARGET_CHAT,
+                    msg.media,
+                    caption=build_caption(cleaned_text),
+                )
+            else:
+                await client.send_message(
+                    TARGET_CHAT,
+                    build_caption(cleaned_text),
                 )
 
             remember_post(
