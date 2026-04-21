@@ -38,7 +38,12 @@ SOURCE_PRIORITY_RAW = os.getenv("SOURCE_PRIORITY", "")
 HEADER = os.getenv("POST_HEADER", "")
 
 # 默认不再自动加底部链接
-FOOTER = os.getenv("POST_FOOTER", "")
+FOOTER = os.getenv(
+    "POST_FOOTER",
+    "👉 海外交友群：https://t.me/ai_r4444\n"
+    "✈️ 投稿爆料澄清：@rr_44i\n"
+    "👉 关注那些事 》@ai_r444",
+)
 
 SOURCE_CHATS = [x.strip().lstrip("@").lower() for x in SOURCE_CHATS_RAW.split(",") if x.strip()]
 
@@ -185,33 +190,37 @@ def clean_text(text: str) -> str:
     text = (text or "").strip()
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # 删来源链接
-    text = remove_source_links(text)
-
-    # 删 Telegram 链接 / 普通链接
+    # 删链接
     text = re.sub(r"https?://t\.me/\S+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"t\.me/\S+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"https?://\S+", "", text, flags=re.IGNORECASE)
 
-    # 删固定来源 / 固定栏目
-    text = re.sub(r"(?im)^.*人民日报.*$", "", text)
-    text = re.sub(r"(?im)^.*东南亚大事件.*$", "", text)
-    text = re.sub(r"(?im)^.*消息汇总.*$", "", text)
-    text = re.sub(r"(?im)^.*东南亚那些事.*$", "", text)
+    # ❗删除人民日报 / 东南亚大事件
+    remove_line_keywords = [
+        "人民日报",
+        "人民日报曝",
+        "人民日报爆",
+        "东南亚大事件",
+        "消息汇总",
+        "东南亚那些事",
+    ]
+    for kw in remove_line_keywords:
+        text = re.sub(rf"(?im)^.*{re.escape(kw)}.*$", "", text)
 
-    # 删常见引流 / 投稿 / 关注 / 评论话术
-    text = re.sub(r"(?im)^.*(订阅|投稿|客服|联系|交友|关注那些事|频道合作|商务合作|广告投放).*$", "", text)
-    text = re.sub(r"(?im)^.*(点击关注|欢迎关注|更多请关注|加入频道|加入群组).*$", "", text)
-    text = re.sub(r"(?im)^.*(评论区聊聊|你怎么看|欢迎留言|欢迎讨论).*$", "", text)
+    # ❗删除废话
+    text = re.sub(
+        r"(?im)^.*(更多情况持续关注|评论区聊聊|你怎么看|欢迎留言|欢迎讨论).*$",
+        "",
+        text,
+    )
 
-    # 删标签 / 用户名
+    # 删除标签/@
     text = re.sub(r"#\w+\b", "", text)
     text = re.sub(r"(?<!\w)@\w+", "", text)
 
-    # 删部分 emoji / 装饰符号
-    text = re.sub(r"[⚡🦑🔠👈👉❤️✈️👑📢👍💥🔥✅✔️☑️😭📣🔊👇🔗]", "", text)
+    # 删除符号
+    text = re.sub(r"[⚡🦑🔠👈👉❤️✈️👑📢👍💥🔥✅✔️☑️😭📣🔊👇🔗🧪➡️]", "", text)
 
-    # 清理多余空白
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
 
