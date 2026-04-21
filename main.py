@@ -199,7 +199,7 @@ def clean_text(text: str) -> str:
     remove_line_keywords = [
         "人民日报", "人民日报曝", "人民日报爆",
         "东南亚大事件", "消息汇总", "东南亚那些事",
-        "欢迎投稿", "投稿", "同城交友", "交友"
+        "欢迎投稿","订阅柬埔寨黑暗事件", "投稿", "同城交友", "交友"
     ]
     for kw in remove_line_keywords:
         text = re.sub(rf"(?im)^.*{re.escape(kw)}.*$", "", text)
