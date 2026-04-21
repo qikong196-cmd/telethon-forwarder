@@ -31,13 +31,9 @@ SOURCE_CHATS_RAW = os.getenv(
     "bx666,bx666bbb,miandianDS,dny858,jpzhadsj,bg123,ft5868a",
 )
 
-# 例: bx666:100,miandiands:95,bg123:90
 SOURCE_PRIORITY_RAW = os.getenv("SOURCE_PRIORITY", "")
 
-# 默认不再自动带“东南亚那些事”
 HEADER = os.getenv("POST_HEADER", "")
-
-# 默认不再自动加底部链接
 FOOTER = os.getenv(
     "POST_FOOTER",
     "👉 海外交友群：https://t.me/ai_r4444\n"
@@ -80,7 +76,6 @@ def ensure_parent_dir(file_path: str):
     Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
 
-# ========= 存储 =========
 def load_state():
     path = Path(DEDUP_FILE)
     default_state = {
@@ -131,7 +126,6 @@ media_hashes = deque(state["media_hashes"][-DEDUP_WINDOW:], maxlen=DEDUP_WINDOW)
 recent_items = deque(state["recent_items"][-DEDUP_WINDOW:], maxlen=DEDUP_WINDOW)
 
 
-# ========= 工具 =========
 def get_source_patterns():
     patterns = []
     for name in SOURCE_CHATS:
@@ -190,15 +184,12 @@ def clean_text(text: str) -> str:
     text = (text or "").strip()
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # 先删来源频道相关链接
     text = remove_source_links(text)
 
-    # 删 Telegram 链接 / 普通链接
     text = re.sub(r"https?://t\.me/\S+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"t\.me/\S+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"https?://\S+", "", text, flags=re.IGNORECASE)
 
-    # 删整行来源/栏目/引流提示
     remove_line_keywords = [
         "人民日报",
         "人民日报曝",
@@ -224,14 +215,11 @@ def clean_text(text: str) -> str:
     for kw in remove_line_keywords:
         text = re.sub(rf"(?im)^.*{re.escape(kw)}.*$", "", text)
 
-    # 删标签 / @用户名
     text = re.sub(r"#\w+\b", "", text)
     text = re.sub(r"(?<!\w)@\w+", "", text)
 
-    # 删装饰 emoji / 杂符号（保守一点，别删太狠）
     text = re.sub(r"[⚡🦑🔠👈👉❤️✈️👑📢💥🔥✅✔️☑️😭📣🔊👇🔗🧪➡️]", "", text)
 
-    # 清理多余空白
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
 
@@ -402,7 +390,6 @@ def remember_post(text: str, source_username: str, media_hash: str = "", media_c
     save_state()
 
 
-# ========= 标签引擎 =========
 LOCATION_RULES = [
     ("#东南亚", ["东南亚", "南洋"]),
     ("#缅甸", ["缅甸", "掸邦", "克钦", "内比都"]),
@@ -503,7 +490,6 @@ def detect_tags(text: str) -> str:
     return " ".join(result[:8])
 
 
-# ========= 标题 / hook =========
 def choose_title_pool(text: str):
     if any(x in text for x in ["警方", "公安", "抓捕", "通缉", "遣返"]):
         return ["【警方通报】", "【最新通报】", "【刚刚通报】", "【案件进展】"]
@@ -536,7 +522,6 @@ def make_hook(text: str) -> str:
     return "👇 更多情况持续关注"
 
 
-# ========= 文案 =========
 def build_caption(text: str) -> str:
     cleaned = clean_text(text)
 
@@ -567,38 +552,40 @@ def build_caption(text: str) -> str:
     return "\n\n".join(parts)
 
 
-# ========= 广告过滤 =========
 def is_ad(text: str) -> tuple[bool, str]:
     lower_text = (text or "").lower()
 
-    # 黑名单
+    # 新闻保护，避免误杀
+    if any(x in text for x in ["网友曝光", "警方", "起诉", "诈骗", "案件", "通报"]):
+        pass
+
     kill_domains = [
         "u8.com",
         "7t.com",
     ]
-
     for d in kill_domains:
         if d in lower_text:
             return True, f"命中黑名单域名: {d}"
 
-    # 变体域名
     if re.search(r"u\s*8\s*[\.\。]\s*com", lower_text):
         return True, "命中U8变体"
 
     if re.search(r"7\s*t\s*[\.\。]\s*com", lower_text):
         return True, "命中7T变体"
 
-    # 硬广告
     hard = [
-        "送彩金", "注册送", "邀请码", "下注", "上分",
+        "送彩金", "注册送", "邀请码", "上分",
         "娱乐城", "pg集团", "pg直营", "官方飞投",
-        "盘口", "百家乐", "出款",
     ]
     for k in hard:
         if k in lower_text:
             return True, f"命中硬广告词: {k}"
 
-    # 软广告
+    gamble_words = ["百家乐", "盘口", "下注", "出款"]
+    if any(w in lower_text for w in gamble_words):
+        if any(x in lower_text for x in ["送彩金", "注册", "邀请码", "充值", "平台", "网址"]):
+            return True, "赌博类广告"
+
     soft = [
         "盈利", "提款", "vip", "福利", "爆率",
         "资金", "贵宾厅", "红包", "活动",
@@ -608,16 +595,12 @@ def is_ad(text: str) -> tuple[bool, str]:
     if len(hit) >= 3:
         return True, f"命中软广告词过多: {','.join(hit[:5])}"
 
-    if (text or "").count("👍") >= 5:
-        return True, "点赞符号过多"
-
-    if lower_text.count("u") >= 8:
-        return True, "可疑重复字符过多"
+    if "百家乐" in lower_text and ((text or "").count("😀") > 5 or (text or "").count("👍") > 5):
+        return True, "表情赌博广告"
 
     return False, ""
 
 
-# ========= 延迟 =========
 async def delay():
     t = random.randint(5, 12)
     logging.info("延迟 %s 秒后发送", t)
@@ -626,93 +609,66 @@ async def delay():
 
 def register_handlers(client):
     @client.on(events.Album(chats=SOURCE_CHATS))
-        async def message_handler(event):
+    async def album_handler(event):
         try:
-            msg = event.message
+            msgs = event.messages or []
             source_name = get_chat_name(event)
             source_username = get_source_username(event)
 
-            if msg.grouped_id:
-                logging.info("单条跳过：属于相册分组 | 来源=%s", source_name)
+            raw_text = "\n".join((m.raw_text or "") for m in msgs).strip()
+            media_files = [m.media for m in msgs if m.media]
+            caption_text = "\n".join((m.raw_text or "") for m in msgs if m.raw_text).strip()
+            media_hash = make_album_media_hash(msgs)
+
+            if not media_files:
+                logging.info("相册跳过：没有媒体 | 来源=%s", source_name)
                 return
 
-            raw_text = msg.raw_text or ""
-            has_media = bool(msg.media)
-            media_hash = make_single_media_hash(msg)
+            base_text = caption_text or raw_text or "album_only_media"
+            cleaned_check_text = clean_text(base_text)
 
-            logging.info("=== 来源=%s | has_media=%s ===", source_name, has_media)
-            logging.info("=== 原始文本=%s ===", raw_text[:500])
-
-            if not raw_text.strip() and has_media:
-                raw_text = "现场画面流出，更多情况持续关注。"
-
-            cleaned_text = clean_text(raw_text)
-            logging.info("=== 清洗后文本=%s ===", cleaned_text[:500])
-
-            ad_flag, ad_reason = is_ad(cleaned_text)
-            logging.info("=== 广告判断=%s | 原因=%s ===", ad_flag, ad_reason)
+            ad_flag, ad_reason = is_ad(cleaned_check_text)
             if ad_flag:
-                logging.info("广告拦截（单条）| 来源=%s | 原因=%s", source_name, ad_reason)
+                logging.info("广告拦截（相册）| 来源=%s | 原因=%s", source_name, ad_reason)
                 return
 
             dup_flag, dup_reason = is_duplicate(
-                cleaned_text or "single_only_media",
+                cleaned_check_text or "album_only_media",
                 source_username=source_username,
                 media_hash=media_hash,
-                media_count=1 if has_media else 0,
+                media_count=len(media_files),
             )
-            logging.info("=== 去重判断=%s | 原因=%s ===", dup_flag, dup_reason)
             if dup_flag:
-                logging.info("重复消息，跳过 | 来源=%s | 原因=%s", source_name, dup_reason)
+                logging.info("重复相册，跳过 | 来源=%s | 原因=%s", source_name, dup_reason)
                 return
 
             logging.info(
-                "收到单条 | 来源=%s | 优先级=%s | 含媒体=%s | 媒体去重=%s | 文本预览=%s",
+                "收到相册 | 来源=%s | 优先级=%s | 图片数=%s | 媒体去重=%s | 文本预览=%s",
                 source_name,
                 get_source_priority(source_username),
-                has_media,
+                len(media_files),
                 "是" if media_hash else "否",
-                (cleaned_text[:60] if cleaned_text else "[无文本]"),
+                (cleaned_check_text[:60] if cleaned_check_text else "[无文本]"),
             )
 
             await delay()
-
-            if has_media:
-                await client.send_file(
-                    TARGET_CHAT,
-                    msg.media,
-                    caption=build_caption(cleaned_text),
-                )
-            else:
-                await client.send_message(
-                    TARGET_CHAT,
-                    build_caption(cleaned_text),
-                )
+            await client.send_file(
+                TARGET_CHAT,
+                media_files,
+                caption=build_caption(base_text),
+                force_document=False,
+            )
 
             remember_post(
-                cleaned_text or "single_only_media",
+                cleaned_check_text or "album_only_media",
                 source_username=source_username,
                 media_hash=media_hash,
-                media_count=1 if has_media else 0,
+                media_count=len(media_files),
             )
-            logging.info("已发一条 | 来源=%s -> 目标=%s", source_name, TARGET_CHAT)
+            logging.info("已发相册 | 来源=%s -> 目标=%s", source_name, TARGET_CHAT)
 
         except Exception as e:
-            logging.exception("单条错误: %s", e)
-
-你这次覆盖时注意两点：
-
-第一，最上面的 @client.on(events.NewMessage(chats=SOURCE_CHATS)) 一定保留。
-第二，整段的缩进不要改，尤其是 try: 下面所有内容和最后的 except。
-
-覆盖完重新部署，再看日志。
-如果还有问题，把新的日志截图发我。
-
-说错 是到775
-已思考 8s
-
-好，这次我直接给你 691 到 775 可直接覆盖版。
-你把这一整段原样替换掉就行：
+            logging.exception("相册错误: %s", e)
 
     @client.on(events.NewMessage(chats=SOURCE_CHATS))
     async def message_handler(event):
