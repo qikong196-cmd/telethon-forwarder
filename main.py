@@ -557,29 +557,38 @@ def build_caption(text: str) -> str:
 def is_ad(text: str) -> tuple[bool, str]:
     lower_text = (text or "").lower()
 
-    # ❗强制封杀指定域名（最高优先级）
-kill_domains = [
-    "u8.com",
-    "7t.com",
-]
+    # 黑名单
+    kill_domains = [
+        "u8.com",
+        "7t.com",
+    ]
 
-for d in kill_domains:
-    if d in lower_text:
-        return True, f"命中黑名单域名: {d}"
+    for d in kill_domains:
+        if d in lower_text:
+            return True, f"命中黑名单域名: {d}"
 
+    # 变体域名
+    if re.search(r"u\s*8\s*[\.\。]\s*com", lower_text):
+        return True, "命中U8变体"
+
+    if re.search(r"7\s*t\s*[\.\。]\s*com", lower_text):
+        return True, "命中7T变体"
+
+    # 硬广告
     hard = [
         "送彩金", "注册送", "邀请码", "下注", "上分",
         "娱乐城", "pg集团", "pg直营", "官方飞投",
-        "盘口", "百家乐", "出款"
+        "盘口", "百家乐", "出款",
     ]
     for k in hard:
         if k in lower_text:
             return True, f"命中硬广告词: {k}"
 
+    # 软广告
     soft = [
         "盈利", "提款", "vip", "福利", "爆率",
         "资金", "贵宾厅", "红包", "活动",
-        "首存", "返佣", "充值", "利润"
+        "首存", "返佣", "充值", "利润",
     ]
     hit = [k for k in soft if k in lower_text]
     if len(hit) >= 3:
