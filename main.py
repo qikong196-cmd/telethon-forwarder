@@ -190,34 +190,48 @@ def clean_text(text: str) -> str:
     text = (text or "").strip()
     text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # 删链接
+    # 先删来源频道相关链接
+    text = remove_source_links(text)
+
+    # 删 Telegram 链接 / 普通链接
     text = re.sub(r"https?://t\.me/\S+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"t\.me/\S+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"https?://\S+", "", text, flags=re.IGNORECASE)
 
-    # 删垃圾来源
+    # 删整行来源/栏目/引流提示
     remove_line_keywords = [
-        "人民日报", "人民日报曝", "人民日报爆",
-        "东南亚大事件", "消息汇总", "东南亚那些事",
-        "欢迎投稿","订阅柬埔寨黑暗事件", "投稿", "同城交友", "交友"
+        "人民日报",
+        "人民日报曝",
+        "人民日报爆",
+        "东南亚大事件",
+        "消息汇总",
+        "东南亚那些事",
+        "订阅柬埔寨黑暗事件",
+        "柬埔寨黑暗事件",
+        "欢迎投稿",
+        "投稿",
+        "同城交友",
+        "交友",
+        "更多情况持续关注",
+        "评论区聊聊",
+        "你怎么看",
+        "欢迎留言",
+        "欢迎讨论",
+        "海外交友群",
+        "投稿爆料澄清",
+        "关注那些事",
     ]
     for kw in remove_line_keywords:
         text = re.sub(rf"(?im)^.*{re.escape(kw)}.*$", "", text)
 
-    # 删废话
-    text = re.sub(
-        r"(?im)^.*(更多情况持续关注|评论区聊聊|你怎么看|欢迎留言|欢迎讨论).*$",
-        "",
-        text,
-    )
-
-    # 删除标签/@
+    # 删标签 / @用户名
     text = re.sub(r"#\w+\b", "", text)
     text = re.sub(r"(?<!\w)@\w+", "", text)
 
-    # 删除符号
-    text = re.sub(r"[⚡🦑🔠👈👉❤️✈️👑📢👍💥🔥✅✔️☑️😭📣🔊👇🔗🧪➡️]", "", text)
+    # 删装饰 emoji / 杂符号（保守一点，别删太狠）
+    text = re.sub(r"[⚡🦑🔠👈👉❤️✈️👑📢💥🔥✅✔️☑️😭📣🔊👇🔗🧪➡️]", "", text)
 
+    # 清理多余空白
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
 
