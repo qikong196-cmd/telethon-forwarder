@@ -195,15 +195,22 @@ def clean_text(text: str) -> str:
     text = re.sub(r"t\.me/\S+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"https?://\S+", "", text, flags=re.IGNORECASE)
 
-    # ❗删除人民日报 / 东南亚大事件
-    remove_line_keywords = [
-        "人民日报",
-        "人民日报曝",
-        "人民日报爆",
-        "东南亚大事件",
-        "消息汇总",
-        "东南亚那些事",
-    ]
+  # ❗彻底清理引流结构
+remove_line_keywords = [
+    "人民日报",
+    "人民日报曝",
+    "人民日报爆",
+    "东南亚大事件",
+    "消息汇总",
+    "东南亚那些事",
+    "欢迎投稿",
+    "投稿",
+    "同城交友",
+    "交友",
+    "交流群",
+]
+for kw in remove_line_keywords:
+    text = re.sub(rf"(?im)^.*{re.escape(kw)}.*$", "", text)
     for kw in remove_line_keywords:
         text = re.sub(rf"(?im)^.*{re.escape(kw)}.*$", "", text)
 
