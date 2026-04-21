@@ -554,7 +554,7 @@ def is_ad(text: str) -> tuple[bool, str]:
     hard = [
         "送彩金", "注册送", "邀请码", "下注", "上分",
         "娱乐城", "pg集团", "pg直营", "官方飞投",
-        "盘口", "百家乐", "出款", ".cc", ".vip", ".com"
+        "盘口", "百家乐", "出款"
     ]
     for k in hard:
         if k in lower_text:
