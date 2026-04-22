@@ -571,63 +571,75 @@ def is_ad(text: str) -> tuple[bool, str]:
         if d in lower_text:
             return True, f"命中黑名单域名: {d}"
 
-    # 接单/开发广告
-    kill_words = [
-        "专注im通讯软件定制搭建",
-        "远洋全球达",
-        "技术团队",
-        "定制开发",
-        "软件定制",
-    ]
-
-    for w in kill_words:
-        if w in lower_text:
-            return True, f"命中接单广告: {w}"
-
-    return False, ""
-    
-# 接单/开发类广告
-kill_words = [
-    "专注im通讯软件定制搭建",
-    "远洋全球达",
-]
-
-for w in kill_words:
-    if w in lower_text:
-        return True, f"命中接单广告: {w}"
-        
-    for d in kill_domains:
-        if d in lower_text:
-            return True, f"命中黑名单域名: {d}"
-
+    # 域名变体
     if re.search(r"u\s*8\s*[\.\。]\s*com", lower_text):
         return True, "命中U8变体"
 
     if re.search(r"7\s*t\s*[\.\。]\s*com", lower_text):
         return True, "命中7T变体"
 
-    hard = [
-        "送彩金", "注册送", "邀请码", "上分",
-        "娱乐城", "pg集团", "pg直营", "官方飞投",
+    if re.search(r"9\s*g\s*[\.\。]\s*com", lower_text):
+        return True, "命中9G变体"
+
+    if re.search(r"g\s*7\s*[\.\。]\s*com", lower_text):
+        return True, "命中G7变体"
+
+    # 接单 / 开发类广告
+    kill_words = [
+        "专注im通讯软件定制搭建",
+        "远洋全球达",
     ]
+
+    for w in kill_words:
+        if w in lower_text:
+            return True, f"命中接单广告: {w}"
+
+    # 明确赌博硬广告
+    hard = [
+        "送彩金",
+        "注册送",
+        "邀请码",
+        "上分",
+        "娱乐城",
+        "pg集团",
+        "pg直营",
+        "官方飞投",
+    ]
+
     for k in hard:
         if k in lower_text:
             return True, f"命中硬广告词: {k}"
 
+    # 赌博词 + 广告语组合，才判广告
     gamble_words = ["百家乐", "盘口", "下注", "出款"]
+    ad_words = ["送彩金", "注册", "邀请码", "充值", "平台", "网址"]
+
     if any(w in lower_text for w in gamble_words):
-        if any(x in lower_text for x in ["送彩金", "注册", "邀请码", "充值", "平台", "网址"]):
+        if any(x in lower_text for x in ad_words):
             return True, "赌博类广告"
 
+    # 软广告
     soft = [
-        "盈利", "提款", "vip", "福利", "爆率",
-        "资金", "贵宾厅", "红包", "活动",
-        "首存", "返佣", "充值", "利润",
+        "盈利",
+        "提款",
+        "vip",
+        "福利",
+        "爆率",
+        "资金",
+        "贵宾厅",
+        "红包",
+        "活动",
+        "首存",
+        "返佣",
+        "充值",
+        "利润",
     ]
+
     hit = [k for k in soft if k in lower_text]
     if len(hit) >= 3:
         return True, f"命中软广告词过多: {','.join(hit[:5])}"
 
+    # 赌博表情刷屏
     if "百家乐" in lower_text and ((text or "").count("😀") > 5 or (text or "").count("👍") > 5):
         return True, "表情赌博广告"
 
