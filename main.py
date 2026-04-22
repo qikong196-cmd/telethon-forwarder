@@ -565,6 +565,7 @@ def is_ad(text: str) -> tuple[bool, str]:
         "7t.com",
         "9g.com",
         "g7.com",
+        "8hyl.vip",
     ]
 
     for d in kill_domains:
@@ -583,6 +584,9 @@ def is_ad(text: str) -> tuple[bool, str]:
 
     if re.search(r"g\s*7\s*[\.\。]\s*com", lower_text):
         return True, "命中G7变体"
+
+    if re.search(r"g\s*7\s*[\.\。]\s*com", lower_text):
+        return True, "命中8HYL变体"
 
     # 接单 / 开发类广告
     kill_words = [
