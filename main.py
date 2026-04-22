@@ -588,6 +588,7 @@ def is_ad(text: str) -> tuple[bool, str]:
     kill_words = [
         "专注im通讯软件定制搭建",
         "远洋全球达",
+        "东南亚百事通",
     ]
 
     for w in kill_words:
