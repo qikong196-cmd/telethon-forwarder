@@ -563,10 +563,18 @@ def is_ad(text: str) -> tuple[bool, str]:
         "u8.com",
         "7t.com",
         "9G.com"，
-        "专注im通讯软件定制搭建",
-        "远洋全球达",
         "G7.com",
     ]
+
+    kill_words = [kill_words = [
+    "专注im通讯软件定制搭建",
+    "远洋全球达",
+]
+
+for w in kill_words:
+    if w in lower_text:
+        return True, f"命中接单广告: {w}"
+        
     for d in kill_domains:
         if d in lower_text:
             return True, f"命中黑名单域名: {d}"
