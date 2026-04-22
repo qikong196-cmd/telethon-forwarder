@@ -562,6 +562,7 @@ def is_ad(text: str) -> tuple[bool, str]:
     kill_domains = [
         "u8.com",
         "7t.com",
+        "9G.com"，
     ]
     for d in kill_domains:
         if d in lower_text:
