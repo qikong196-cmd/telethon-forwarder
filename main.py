@@ -555,18 +555,25 @@ def build_caption(text: str) -> str:
 def is_ad(text: str) -> tuple[bool, str]:
     lower_text = (text or "").lower()
 
-    # 新闻保护，避免误杀
-    if any(x in text for x in ["网友曝光", "警方", "起诉", "诈骗", "案件", "通报"]):
-        pass
+   # 新闻保护（避免误杀）
+if any(x in text for x in ["网友曝光", "警方", "起诉", "诈骗", "案件", "通报"]):
+    pass
 
-    kill_domains = [
-        "u8.com",
-        "7t.com",
-        "9G.com"，
-        "G7.com",
-    ]
+# 域名黑名单
+kill_domains = [
+    "u8.com",
+    "7t.com",
+    "9g.com",
+    "g7.com",
+]
 
-    kill_words = [kill_words = [
+for d in kill_domains:
+    if d in lower_text:
+        return True, f"命中黑名单域名: {d}"
+
+
+# 接单/开发类广告
+kill_words = [
     "专注im通讯软件定制搭建",
     "远洋全球达",
 ]
